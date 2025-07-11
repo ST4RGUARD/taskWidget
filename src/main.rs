@@ -13,6 +13,9 @@ struct Task {
 
     #[serde(skip)]
     editing: bool,
+
+    #[serde(skip)]
+    editing_priority: bool,
 }
 
 struct MyApp {
@@ -22,6 +25,8 @@ struct MyApp {
     new_task_color: Color32,
     last_save: Instant,
     last_deleted_tasks: Vec<Task>,
+    dragging_task: Option<usize>,
+    drag_over_task: Option<usize>,
 }
 
 impl Default for MyApp {
@@ -33,6 +38,8 @@ impl Default for MyApp {
             new_task_color: Color32::WHITE,
             last_save: Instant::now(),
             last_deleted_tasks: Vec::new(),
+            dragging_task: None,
+            drag_over_task: None,
         }
     }
 }
@@ -77,6 +84,7 @@ impl MyApp {
             color: array_from_color32(self.new_task_color),
             selected: false,
             editing: false,
+            editing_priority: false,
         });
 
         // Sort tasks by priority descending (higher priority first)
@@ -212,8 +220,7 @@ impl eframe::App for MyApp {
             }
 
             // Show tasks
-            let mut drag_index: Option<usize> = None;
-            let mut drop_index: Option<usize> = None;
+            let mut priority_changed = false;
 
             for (i, task) in self.tasks.iter_mut().enumerate() {
                 egui::Frame::none()
@@ -224,25 +231,58 @@ impl eframe::App for MyApp {
                         egui::Stroke::new(1.0, Color32::BLACK)
                     })
                     .rounding(egui::Rounding::same(8.0))
+                    .inner_margin(egui::Margin {
+                        left: 6.0,
+                        right: 6.0,
+                        top: 6.0,
+                        bottom: 6.0,
+                    })
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.add_space(6.0);
 
-                            
-
+                            // Priority box with editing support
                             egui::Frame::none()
                                 .fill(Color32::BLACK)
-                                .stroke(egui::Stroke::new(1.5, Color32::WHITE))
+                                .stroke(egui::Stroke::new(1.0, Color32::from_rgb(255, 165, 0)))
                                 .rounding(egui::Rounding::same(6.0))
+                                .inner_margin(egui::Margin {
+                                    left: 2.0,
+                                    right: 2.0,
+                                    top: 4.0,
+                                    bottom: 2.0,
+                                })
                                 .show(ui, |ui| {
-                                    let priority_size = Vec2::new(30.0, 30.0);
+                                    let priority_size = Vec2::new(32.0, 24.0);
                                     ui.allocate_ui(priority_size, |ui| {
                                         ui.centered_and_justified(|ui| {
-                                            ui.label(
-                                                egui::RichText::new(task.priority.to_string())
-                                                    .color(Color32::WHITE)
-                                                    .size(22.0),
-                                            );
+                                            if task.editing_priority {
+                                                let response = ui.add(
+                                                    egui::DragValue::new(&mut task.priority)
+                                                        .clamp_range(1..=10)
+                                                        .speed(1),
+                                                );
+                                                if response.lost_focus()
+                                                    || ui.input(|i| i.key_pressed(Key::Enter))
+                                                {
+                                                    task.editing_priority = false;
+                                                    priority_changed = true;
+                                                }
+                                            } else {
+                                                let response = ui.add(
+                                                    egui::Label::new(
+                                                        egui::RichText::new(
+                                                            task.priority.to_string(),
+                                                        )
+                                                        .color(Color32::WHITE)
+                                                        .size(14.0),
+                                                    )
+                                                    .sense(egui::Sense::click()),
+                                                );
+                                                if response.double_clicked() {
+                                                    task.editing_priority = true;
+                                                }
+                                            }
                                         });
                                     });
                                 });
@@ -250,50 +290,65 @@ impl eframe::App for MyApp {
                             ui.add_space(10.0);
 
                             let available_width = ui.available_width();
+                            let font_id = egui::FontId::proportional(14.0);
 
                             if task.editing {
-                                // Show editable text box bound to task.text
                                 let response = ui.add_sized(
                                     Vec2::new(available_width, 30.0),
                                     egui::TextEdit::singleline(&mut task.text)
-                                        .font(egui::FontId::proportional(20.0))
+                                        .font(font_id.clone())
                                         .desired_width(f32::INFINITY),
                                 );
 
-                                // Exit edit mode on Enter
                                 if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))
                                 {
                                     task.editing = false;
                                 }
                             } else {
-                                // Show task text normally, centered
+                                let font_id = egui::FontId::proportional(16.0);
+                                let padding = 12.0;
+                                let text_width = available_width - padding;
+
+                                // Layout job to measure wrapped text height
+                                let job = egui::text::LayoutJob::simple(
+                                    task.text.clone(),
+                                    font_id.clone(),
+                                    Color32::BLACK,
+                                    text_width,
+                                );
+                                let galley = ui.fonts(|f| f.layout_job(job));
+                                let text_height = galley.size().y;
+                                let block_height = text_height + padding;
+
+                                // Allocate a draggable and clickable response for the task text area
                                 let response = ui.allocate_response(
-                                    Vec2::new(available_width, 40.0),
+                                    Vec2::new(available_width, block_height),
                                     egui::Sense::click_and_drag(),
                                 );
 
-                                ui.painter().text(
-                                    response.rect.center(),
-                                    egui::Align2::CENTER_CENTER,
-                                    &task.text,
-                                    egui::FontId::proportional(20.0),
-                                    Color32::BLACK,
+                                // Draw the wrapped text with padding
+                                ui.painter().galley(
+                                    response.rect.left_top() + egui::vec2(6.0, 6.0),
+                                    galley,
                                 );
 
+                                // Editing toggle on double-click
                                 if response.double_clicked() {
                                     task.editing = true;
                                 }
 
+                                // Selection toggle on click
                                 if response.clicked() {
                                     task.selected = !task.selected;
                                 }
 
+                                // Drag handling: track drag start and drag over target
                                 if response.drag_started() {
-                                    drag_index = Some(i);
+                                    self.dragging_task = Some(i);
                                 }
 
                                 if response.hovered() && ui.input(|i| i.pointer.any_released()) {
-                                    drop_index = Some(i);
+                                    self.drag_over_task = Some(i);
                                 }
                             }
                         });
@@ -302,11 +357,40 @@ impl eframe::App for MyApp {
                 ui.add_space(4.0);
             }
 
-            if let (Some(from), Some(to)) = (drag_index, drop_index) {
-                if from != to {
+            if priority_changed {
+                self.tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
+            }
+
+            // After the loop, handle reordering and priority adjustment if drag completed
+            if let (Some(from), Some(to)) = (self.dragging_task, self.drag_over_task) {
+                if from != to && from < self.tasks.len() && to < self.tasks.len() {
                     let task = self.tasks.remove(from);
                     self.tasks.insert(to, task);
+
+                    let len = self.tasks.len();
+
+                    let new_priority = if to == 0 {
+                        if len > 1 {
+                            self.tasks[1].priority.max(1).min(10)
+                        } else {
+                            self.tasks[to].priority
+                        }
+                    } else if to == len - 1 {
+                        self.tasks[len - 2].priority.min(10).max(1)
+                    } else {
+                        let prev_p = self.tasks[to - 1].priority;
+                        let next_p = self.tasks[to + 1].priority;
+                        let low = prev_p.min(next_p);
+                        let high = prev_p.max(next_p);
+                        self.tasks[to].priority.clamp(low, high)
+                    };
+
+                    self.tasks[to].priority = new_priority;
+                    //self.tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
                 }
+
+                self.dragging_task = None;
+                self.drag_over_task = None;
             }
 
             ui.add_space(12.0);
@@ -318,6 +402,9 @@ impl eframe::App for MyApp {
                     .add_enabled(any_selected, egui::Button::new("🗑 Delete selected"))
                     .clicked()
                 {
+                    self.last_deleted_tasks =
+                        self.tasks.iter().filter(|t| t.selected).cloned().collect();
+
                     self.tasks.retain(|t| !t.selected);
                 }
             });
@@ -343,7 +430,7 @@ fn main() -> eframe::Result<()> {
     options.initial_window_size = Some(Vec2::new(550.0, 450.0));
 
     eframe::run_native(
-        "Rust Task Manager",
+        "Nazario Lives",
         options,
         Box::new(|_cc| {
             Box::new(MyApp {

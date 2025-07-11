@@ -1,1 +1,1 @@
-/Users/jarjohns/git/task_widget/target/release/task_widget: /Users/jarjohns/git/task_widget/src/main.rs
+/Users/jarjohns/git/taskWidget/target/release/task_widget: /Users/jarjohns/git/taskWidget/src/main.rs
