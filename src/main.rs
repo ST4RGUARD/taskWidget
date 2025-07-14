@@ -180,42 +180,43 @@ impl eframe::App for MyApp {
             ui.add_space(16.0);
 
             // Keyboard navigation
-            let selected_idx = self.tasks.iter().position(|t| t.selected);
-            if ui.input(|i| i.key_pressed(Key::J)) {
-                if let Some(i) = selected_idx {
-                    if i + 1 < self.tasks.len() {
-                        self.tasks[i].selected = false;
-                        self.tasks[i + 1].selected = true;
+            if !ctx.wants_keyboard_input() {
+                let selected_idx = self.tasks.iter().position(|t| t.selected);
+
+                if ui.input(|i| i.key_pressed(Key::J)) {
+                    if let Some(i) = selected_idx {
+                        if i + 1 < self.tasks.len() {
+                            self.tasks[i].selected = false;
+                            self.tasks[i + 1].selected = true;
+                        }
+                    } else if !self.tasks.is_empty() {
+                        self.tasks[0].selected = true;
                     }
-                } else if !self.tasks.is_empty() {
-                    self.tasks[0].selected = true;
                 }
-            }
 
-            if ui.input(|i| i.key_pressed(Key::K)) {
-                if let Some(i) = selected_idx {
-                    if i > 0 {
-                        self.tasks[i].selected = false;
-                        self.tasks[i - 1].selected = true;
+                if ui.input(|i| i.key_pressed(Key::K)) {
+                    if let Some(i) = selected_idx {
+                        if i > 0 {
+                            self.tasks[i].selected = false;
+                            self.tasks[i - 1].selected = true;
+                        }
+                    } else if !self.tasks.is_empty() {
+                        self.tasks[0].selected = true;
                     }
-                } else if !self.tasks.is_empty() {
-                    self.tasks[0].selected = true;
                 }
-            }
 
-            if ui.input(|i| i.key_pressed(Key::D)) {
-                self.last_deleted_tasks =
-                    self.tasks.iter().filter(|t| t.selected).cloned().collect();
+                if ui.input(|i| i.key_pressed(Key::D)) {
+                    self.last_deleted_tasks =
+                        self.tasks.iter().filter(|t| t.selected).cloned().collect();
+                    self.tasks.retain(|t| !t.selected);
+                }
 
-                self.tasks.retain(|t| !t.selected);
-            }
-
-            // Undo last delete on pressing U
-            if ui.input(|i| i.key_pressed(Key::U)) {
-                if !self.last_deleted_tasks.is_empty() {
-                    self.tasks.append(&mut self.last_deleted_tasks);
-                    self.tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
-                    self.last_deleted_tasks.clear();
+                if ui.input(|i| i.key_pressed(Key::U)) {
+                    if !self.last_deleted_tasks.is_empty() {
+                        self.tasks.append(&mut self.last_deleted_tasks);
+                        self.tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
+                        self.last_deleted_tasks.clear();
+                    }
                 }
             }
 
