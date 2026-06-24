@@ -220,147 +220,159 @@ impl eframe::App for MyApp {
                 }
             }
 
-            // Show tasks
-            let mut priority_changed = false;
-
-            for (i, task) in self.tasks.iter_mut().enumerate() {
-                egui::Frame::none()
-                    .fill(color32_from_array(task.color))
-                    .stroke(if task.selected {
-                        egui::Stroke::new(3.0, Color32::YELLOW)
-                    } else {
-                        egui::Stroke::new(1.0, Color32::BLACK)
-                    })
-                    .rounding(egui::Rounding::same(8.0))
-                    .inner_margin(egui::Margin {
-                        left: 6.0,
-                        right: 6.0,
-                        top: 6.0,
-                        bottom: 6.0,
-                    })
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.add_space(6.0);
-
-                            // Priority box with editing support
-                            egui::Frame::none()
-                                .fill(Color32::BLACK)
-                                .stroke(egui::Stroke::new(1.0, Color32::from_rgb(255, 165, 0)))
-                                .rounding(egui::Rounding::same(6.0))
-                                .inner_margin(egui::Margin {
-                                    left: 2.0,
-                                    right: 2.0,
-                                    top: 4.0,
-                                    bottom: 2.0,
-                                })
-                                .show(ui, |ui| {
-                                    let priority_size = Vec2::new(32.0, 24.0);
-                                    ui.allocate_ui(priority_size, |ui| {
-                                        ui.centered_and_justified(|ui| {
-                                            if task.editing_priority {
-                                                let response = ui.add(
-                                                    egui::DragValue::new(&mut task.priority)
-                                                        .clamp_range(1..=10)
-                                                        .speed(1),
-                                                );
-                                                if response.lost_focus()
-                                                    || ui.input(|i| i.key_pressed(Key::Enter))
-                                                {
-                                                    task.editing_priority = false;
-                                                    priority_changed = true;
-                                                }
-                                            } else {
-                                                let response = ui.add(
-                                                    egui::Label::new(
-                                                        egui::RichText::new(
-                                                            task.priority.to_string(),
-                                                        )
-                                                        .color(Color32::WHITE)
-                                                        .size(14.0),
-                                                    )
-                                                    .sense(egui::Sense::click()),
-                                                );
-                                                if response.double_clicked() {
-                                                    task.editing_priority = true;
-                                                }
-                                            }
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .max_height(ui.available_height() - 50.0)
+                .show(ui, |ui| {
+                    let mut priority_changed = false;
+                    for (i, task) in self.tasks.iter_mut().enumerate() {
+                        egui::Frame::none()
+                            .fill(color32_from_array(task.color))
+                            .stroke(if task.selected {
+                                egui::Stroke::new(3.0, Color32::YELLOW)
+                            } else {
+                                egui::Stroke::new(1.0, Color32::BLACK)
+                            })
+                            .rounding(egui::Rounding::same(8.0))
+                            .inner_margin(egui::Margin {
+                                left: 6.0,
+                                right: 6.0,
+                                top: 6.0,
+                                bottom: 6.0,
+                            })
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.add_space(6.0);
+                                    // Priority box with editing support
+                                    egui::Frame::none()
+                                        .fill(Color32::BLACK)
+                                        .stroke(egui::Stroke::new(
+                                            1.0,
+                                            Color32::from_rgb(255, 165, 0),
+                                        ))
+                                        .rounding(egui::Rounding::same(6.0))
+                                        .inner_margin(egui::Margin {
+                                            left: 2.0,
+                                            right: 2.0,
+                                            top: 4.0,
+                                            bottom: 2.0,
+                                        })
+                                        .show(ui, |ui| {
+                                            let priority_size = Vec2::new(32.0, 24.0);
+                                            ui.allocate_ui(priority_size, |ui| {
+                                                ui.centered_and_justified(|ui| {
+                                                    if task.editing_priority {
+                                                        let response = ui.add(
+                                                            egui::DragValue::new(
+                                                                &mut task.priority,
+                                                            )
+                                                            .clamp_range(1..=10)
+                                                            .speed(1),
+                                                        );
+                                                        if response.lost_focus()
+                                                            || ui.input(|i| {
+                                                                i.key_pressed(egui::Key::Enter)
+                                                            })
+                                                        {
+                                                            task.editing_priority = false;
+                                                            priority_changed = true;
+                                                        }
+                                                    } else {
+                                                        let response = ui.add(
+                                                            egui::Label::new(
+                                                                egui::RichText::new(
+                                                                    task.priority.to_string(),
+                                                                )
+                                                                .color(Color32::WHITE)
+                                                                .size(14.0),
+                                                            )
+                                                            .sense(egui::Sense::click()),
+                                                        );
+                                                        if response.double_clicked() {
+                                                            task.editing_priority = true;
+                                                        }
+                                                    }
+                                                });
+                                            });
                                         });
-                                    });
+
+                                    ui.add_space(6.0);
                                 });
 
-                            ui.add_space(10.0);
+                                ui.add_space(10.0);
 
-                            let available_width = ui.available_width();
-                            let font_id = egui::FontId::proportional(14.0);
+                                let available_width = ui.available_width();
+                                let font_id = egui::FontId::proportional(14.0);
 
-                            if task.editing {
-                                let response = ui.add_sized(
-                                    Vec2::new(available_width, 30.0),
-                                    egui::TextEdit::singleline(&mut task.text)
-                                        .font(font_id.clone())
-                                        .desired_width(f32::INFINITY),
-                                );
+                                if task.editing {
+                                    let response = ui.add_sized(
+                                        Vec2::new(available_width, 30.0),
+                                        egui::TextEdit::singleline(&mut task.text)
+                                            .font(font_id.clone())
+                                            .desired_width(f32::INFINITY),
+                                    );
 
-                                if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))
-                                {
-                                    task.editing = false;
+                                    if response.lost_focus()
+                                        && ui.input(|i| i.key_pressed(Key::Enter))
+                                    {
+                                        task.editing = false;
+                                    }
+                                } else {
+                                    let font_id = egui::FontId::proportional(16.0);
+                                    let padding = 12.0;
+                                    let text_width = available_width - padding;
+
+                                    // Layout job to measure wrapped text height
+                                    let job = egui::text::LayoutJob::simple(
+                                        task.text.clone(),
+                                        font_id.clone(),
+                                        Color32::BLACK,
+                                        text_width,
+                                    );
+                                    let galley = ui.fonts(|f| f.layout_job(job));
+                                    let text_height = galley.size().y;
+                                    let block_height = text_height + padding;
+
+                                    // Allocate a draggable and clickable response for the task text area
+                                    let response = ui.allocate_response(
+                                        Vec2::new(available_width, block_height),
+                                        egui::Sense::click_and_drag(),
+                                    );
+
+                                    // Draw the wrapped text with padding
+                                    ui.painter().galley(
+                                        response.rect.left_top() + egui::vec2(6.0, 6.0),
+                                        galley,
+                                    );
+
+                                    // Editing toggle on double-click
+                                    if response.double_clicked() {
+                                        task.editing = true;
+                                    }
+
+                                    // Selection toggle on click
+                                    if response.clicked() {
+                                        task.selected = !task.selected;
+                                    }
+
+                                    // Drag handling: track drag start and drag over target
+                                    if response.drag_started() {
+                                        self.dragging_task = Some(i);
+                                    }
+
+                                    if response.hovered() && ui.input(|i| i.pointer.any_released())
+                                    {
+                                        self.drag_over_task = Some(i);
+                                    }
                                 }
-                            } else {
-                                let font_id = egui::FontId::proportional(16.0);
-                                let padding = 12.0;
-                                let text_width = available_width - padding;
+                            });
+                        ui.add_space(4.0);
+                    }
 
-                                // Layout job to measure wrapped text height
-                                let job = egui::text::LayoutJob::simple(
-                                    task.text.clone(),
-                                    font_id.clone(),
-                                    Color32::BLACK,
-                                    text_width,
-                                );
-                                let galley = ui.fonts(|f| f.layout_job(job));
-                                let text_height = galley.size().y;
-                                let block_height = text_height + padding;
-
-                                // Allocate a draggable and clickable response for the task text area
-                                let response = ui.allocate_response(
-                                    Vec2::new(available_width, block_height),
-                                    egui::Sense::click_and_drag(),
-                                );
-
-                                // Draw the wrapped text with padding
-                                ui.painter().galley(
-                                    response.rect.left_top() + egui::vec2(6.0, 6.0),
-                                    galley,
-                                );
-
-                                // Editing toggle on double-click
-                                if response.double_clicked() {
-                                    task.editing = true;
-                                }
-
-                                // Selection toggle on click
-                                if response.clicked() {
-                                    task.selected = !task.selected;
-                                }
-
-                                // Drag handling: track drag start and drag over target
-                                if response.drag_started() {
-                                    self.dragging_task = Some(i);
-                                }
-
-                                if response.hovered() && ui.input(|i| i.pointer.any_released()) {
-                                    self.drag_over_task = Some(i);
-                                }
-                            }
-                        });
-                    });
-
-                ui.add_space(4.0);
-            }
-
-            if priority_changed {
-                self.tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
-            }
+                    if priority_changed {
+                        self.tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
+                    }
+                });
 
             // After the loop, handle reordering and priority adjustment if drag completed
             if let (Some(from), Some(to)) = (self.dragging_task, self.drag_over_task) {
